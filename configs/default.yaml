@@ -1,0 +1,68 @@
+# SlideShift Master Configuration File
+project_name: "SlideShift"
+data_dir: "data"
+output_dir: "outputs"
+task_name: "camelyon16"
+
+tiling:
+  target_mpp: 0.50             # Standardized physical resolution (~20x magnification)
+  tile_size_px: 256            # Standard tile size
+  min_tissue_fraction: 0.20    # Keep tiles with at least 20% tissue
+  overlap_px: 0                # Non-overlapping for extraction, set > 0 for smooth heatmaps
+  segmentation_downsample: 32  # Downsample factor for thumbnail tissue thresholding
+  blur_threshold: 80.0         # Laplacian variance sharpness cutoff
+  save_thumbnails: true
+
+encoder:
+  model_name: "resnet50"       # Options: resnet50, phikon, uni, conch, virchow, mock
+  checkpoint_path: null
+  batch_size: 64
+  num_workers: 4
+  use_fp16: true
+  device: "cuda"
+  cache_format: "h5"           # Cache features as HDF5 (.h5)
+
+mil:
+  architecture: "abmil"        # Options: mean_pool, max_pool, abmil, clam_sb, clam_mb, transmil
+  num_classes: 2
+  hidden_dim: 256
+  dropout: 0.25
+  instance_dropout: 0.10       # Regularization: randomly drop 10% of tiles during training
+  feature_noise_std: 0.02      # Regularization: small Gaussian jitter on embeddings
+  learning_rate: 0.0001
+  weight_decay: 0.0001
+  epochs: 50
+  patience: 10
+  class_weighting: true
+  seeds: [42, 101, 2024]
+  n_splits: 5
+  split_strategy: "patient_stratified"  # Prevents multi-slide patient leakage
+
+robustness:
+  test_subset_size: 200
+  shifts_to_test:
+    - "stain_he_jitter"
+    - "stain_saturation_shift"
+    - "gaussian_blur"
+    - "jpeg_compression"
+    - "additive_noise"
+    - "resolution_mismatch"
+  severity_levels: [1, 2, 3]
+  evaluate_calibration: true
+  evaluate_flip_rate: true
+  evaluate_heatmap_stability: true
+  evaluate_embedding_shortcuts: true
+
+mitigation:
+  stain_normalization: "none"  # Options: none, macenko, reinhard
+  per_slide_standardization: false
+  domain_adversarial: false
+  domain_weight: 0.1
+
+monitor:
+  method: "combined"           # Stain moments + feature embedding distance
+  target_false_alarm_rate: 0.05
+  stain_weight: 0.40
+  embedding_weight: 0.60
+  cache_reference_stats: true
+
