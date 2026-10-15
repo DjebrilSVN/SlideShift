@@ -1,0 +1,33 @@
+# CAMELYON16 Binary Metastasis Classification with ABMIL
+project_name: "SlideShift_CAMELYON16"
+task_name: "camelyon16"
+data_dir: "data/camelyon16"
+output_dir: "outputs/camelyon16"
+
+tiling:
+  target_mpp: 0.50
+  tile_size_px: 256
+  min_tissue_fraction: 0.20
+
+encoder:
+  model_name: "uni"
+  use_fp16: true
+  batch_size: 64
+
+mil:
+  architecture: "abmil"
+  num_classes: 2
+  hidden_dim: 256
+  dropout: 0.25
+  instance_dropout: 0.15
+  learning_rate: 0.0001
+  epochs: 40
+  patience: 8
+
+robustness:
+  test_subset_size: 150
+  shifts_to_test:
+    - "stain_he_jitter"
+    - "gaussian_blur"
+    - "resolution_mismatch"
+
