@@ -1,0 +1,68 @@
+name: SlideShift CI
+
+on:
+  push:
+    branches: ["main", "develop"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install core dependencies (no torch)
+        run: |
+          pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Lint with Ruff
+        run: |
+          pip install ruff
+          ruff check slideshift/ tests/ --select=E,W,F --ignore=E501,W291,W293
+
+      - name: Run tests (no torch)
+        run: |
+          python -m pytest tests/ -v --tb=short --timeout=120
+
+      - name: Check CLI commands
+        run: |
+          python -m slideshift.cli synthetic-data --output-dir /tmp/test_cohort --num-slides 6
+          python -m slideshift.cli extract --slide-dir /tmp/test_cohort --output-dir /tmp/test_features --model mock
+          python -m slideshift.cli train --feature-dir /tmp/test_features --arch abmil --epochs 3
+          python -m slideshift.cli robustness --feature-dir /tmp/test_features --output-dir /tmp/test_robustness
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results-${{ matrix.python-version }}
+          path: /tmp/test_robustness/
+          retention-days: 7
+
+  lint-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Check type annotations compile
+        run: |
+          pip install -e ".[dev]"
+          python -c "import slideshift; print('Package import OK')"
+          python -c "from slideshift.mil.aggregators import AGGREGATOR_REGISTRY; print('Registry:', list(AGGREGATOR_REGISTRY.keys()))"
+          python -c "from slideshift.robustness.conformal import ConformalPredictor; print('Conformal OK')"
+          python -c "from slideshift.monitor.fingerprint import ScannerFingerprintExtractor; print('Fingerprint OK')"
+          python -c "from slideshift.mil.survival import CoxSurvivalHead; print('Survival OK')"
+
